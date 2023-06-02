@@ -1,4 +1,4 @@
-Renamed `carb/carb.py` as `carb/benchmark`
+Renamed `carb/carb.py` as `carb/benchmark.py`
 Added `carb.` in a lot of places despite `sys.path.insert(0, 'carb')`
 
 
