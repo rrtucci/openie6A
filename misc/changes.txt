@@ -1,0 +1,8 @@
+Renamed `carb/carb.py` as `carb/benchmark`
+Added `carb.` in a lot of places despite `sys.path.insert(0, 'carb')`
+
+
+https://huggingface.co/docs/transformers/main/migration
+
+tokenizer = AutoTokenizer.from_pretrained("bert-base-cased", use_fast=False)
+pip install transformers sentencepiece
