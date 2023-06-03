@@ -1,4 +1,3 @@
-# spacy
 docopt
 numpy
 ipdb
