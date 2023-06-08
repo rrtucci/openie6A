@@ -16,7 +16,7 @@ import regex as re
 import difflib
 
 
-class Record(object):
+class Record:
     """
     the precision equals how many of the conjuncts output
     by the algorithm are correct, and the recall is the
@@ -67,7 +67,7 @@ class Record(object):
             .format(self.tp, self.tp_t, self.tp_f, self.fp, self.fn, self.tn)
 
 
-class Coordination(object):
+class Coordination:
     __slots__ = ('cc', 'conjuncts', 'seps', 'label')
 
     def __init__(self, cc, conjuncts, seps=None, label=None):
@@ -136,7 +136,7 @@ def post_process(coords, is_quote):
     return new_coords
 
 
-class Counter(object):
+class Counter:
 
     class Criteria(Enum):
         WHOLE = 0
@@ -303,9 +303,10 @@ def dedup_extractions(extractions_list, conj_words):
     return extractions_list
 
 
-class Conjunction():
+class Conjunction:
     def __init__(self, dump_dir=None):
-        super(Conjunction, self).__init__()
+        # Conjuction has no super so this statement is unnecessary
+        # super(Conjunction, self).__init__()
         self._counter_whole = Counter(Counter.Criteria.WHOLE)
         self._counter_outer = Counter(Counter.Criteria.OUTER)
         self._counter_inner = Counter(Counter.Criteria.INNER)
@@ -321,7 +322,7 @@ class Conjunction():
             if os.path.exists(dump_dir+'/gt_it_coords.pkl'):
                 os.remove(dump_dir+'/gt_it_coords.pkl')
 
-    def __call__(self, predictions, ground_truth,
+    def __call__(self, tokens, predictions, ground_truth,
                  meta_data=None, coords=False):
         # coords == True when we give it the complete coords
         # happens when we want to evaluate on the original system outputs
@@ -386,7 +387,7 @@ class Conjunction():
         return counter.overall.f1_score
 
 
-class Carb():
+class Carb:
     def __init__(self, hparams, mapping=None):
         super(Carb, self).__init__()
         self._dev_benchmark = Benchmark('carb/data/gold/dev.tsv')
