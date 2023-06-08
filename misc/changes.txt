@@ -6,3 +6,11 @@ https://huggingface.co/docs/transformers/main/migration
 
 tokenizer = AutoTokenizer.from_pretrained("bert-base-cased", use_fast=False)
 pip install transformers sentencepiece
+
+https://github.com/dair-iitd/CaRB
+
+https://github.com/dair-iitd/imojie
+data    https://zenodo.org/record/3775983
+
+https://github.com/dair-iitd/openie6
+data    https://zenodo.org/record/4054476

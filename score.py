@@ -20,7 +20,8 @@ def parse_args():
 
     return parser
 
-def generate_probs(model_dir, inp_fp, weights_fp, topk, out_ext, cuda_device, overwrite, batch_size, extraction_ratio, out):
+def generate_probs(model_dir, inp_fp, weights_fp, topk, out_ext,
+                   cuda_device, overwrite, batch_size, extraction_ratio, out):
     import_submodules('imojie')
 
     args = argparse.Namespace()
@@ -85,15 +86,22 @@ def generate_probs(model_dir, inp_fp, weights_fp, topk, out_ext, cuda_device, ov
         return all_fields_sorted
 
 
-def rescore(inp_fp, topk=None, out_ext=None, model_dir='imojie/models/be', cuda_device=0, overwrite=True, ext_ratio=1, batch_size = 64):
+def rescore(inp_fp, topk=None, out_ext=None, model_dir='imojie/models/be',
+            cuda_device=0, overwrite=True, ext_ratio=1, batch_size = 64):
     weights_fp = model_dir + '/best.th'
-    return generate_probs(model_dir, inp_fp, weights_fp, topk, out_ext, cuda_device, overwrite=overwrite, extraction_ratio=ext_ratio, batch_size=batch_size, out=None)
+    return generate_probs(model_dir, inp_fp, weights_fp, topk,
+                          out_ext, cuda_device, overwrite=overwrite,
+                          extraction_ratio=ext_ratio, batch_size=batch_size,
+                          out=None)
 
 
 def main():
     parser = parse_args()
     args = parser.parse_args()
-    generate_probs('../models/rescore_model', args.inp, '../models/rescore_model/best.th', args.topk, None, 0, overwrite=True, extraction_ratio=1, batch_size=256, out=args.out)
+    generate_probs('../models/rescore_model', args.inp,
+                   '../models/rescore_model/best.th', args.topk,
+                   None, 0, overwrite=True, extraction_ratio=1,
+                   batch_size=256, out=args.out)
 
 if __name__ == '__main__':
     main()

@@ -15,7 +15,7 @@ import regex as re
 
 import torch
 import torch.nn.functional as F
-from torchtext import data
+import torchtext.data as dat
 from torch import nn
 from torch.utils.data import DataLoader
 from torch.nn import LSTM, CrossEntropyLoss
@@ -25,7 +25,7 @@ from pytorch_lightning.callbacks import EarlyStopping
 from transformers import AdamW, AutoModel
 
 from carb.oie_readers.extraction import Extraction
-import data
+import data_processing as datpro
 import metric
 from metric import Conjunction, Carb
 
@@ -296,19 +296,19 @@ class Model(pl.LightningModule):
 
         return hinge_loss
 
-    def get_progress_bar_dict(self):
-        running_train_loss = self.trainer.running_loss.mean()
-        avg_training_loss = running_train_loss.cpu().item() if \
-            running_train_loss is not None else float('NaN')
-        if type(self.trainer.checkpoint_callback.kth_value) != type(0.0):
-            best = self.trainer.checkpoint_callback.kth_value.item()
-        else:
-            best = self.trainer.checkpoint_callback.kth_value
-        tqdm = {'loss': '{:.3f}'.format(avg_training_loss), 'best': best}
-        return tqdm
+    # def get_progress_bar_dict(self):
+    #     running_train_loss = self.trainer.running_loss.mean()
+    #     avg_training_loss = running_train_loss.cpu().item() if \
+    #         running_train_loss is not None else float('NaN')
+    #     if type(self.trainer.checkpoint_callback.kth_value) != type(0.0):
+    #         best = self.trainer.checkpoint_callback.kth_value.item()
+    #     else:
+    #         best = self.trainer.checkpoint_callback.kth_value
+    #     tqdm = {'loss': '{:.3f}'.format(avg_training_loss), 'best': best}
+    #     return tqdm
 
     def training_step(self, batch, batch_idx, optimizer_idx=-1):
-        batch = data.dotdict(batch)
+        batch = datpro.dotdict(batch)
 
         if self.hparams.multi_opt:
             constraints = self.hparams.constraints.split('_')[optimizer_idx]
@@ -326,7 +326,7 @@ class Model(pl.LightningModule):
         return output
 
     def validation_step(self, batch, batch_idx):
-        batch = data.dotdict(batch)
+        batch = datpro.dotdict(batch)
         output_dict = self.forward(batch, mode='val',
                                    constraints=self.hparams.constraints,
                                    cweights=self.hparams.cweights)
@@ -519,9 +519,8 @@ class Model(pl.LightningModule):
                         0] != '' and pro_extraction.pred != '':
                         if self._metric.mapping:
                             if not contains_extraction(pro_extraction,
-                                                       all_predictions[
-                                                           self._metric.mapping[
-                                                               orig_sentence]]):
+                                all_predictions[
+                                    self._metric.mapping[orig_sentence]]):
                                 all_predictions[self._metric.mapping[
                                     orig_sentence]].append(
                                     pro_extraction)
@@ -540,9 +539,9 @@ class Model(pl.LightningModule):
                 sentence_str = f'{sentence}\n'
                 for extraction in predicted_extractions:
                     if self.hparams.type == 'sentences':
-                        ext_str = data.ext_to_sentence(extraction) + '\n'
+                        ext_str = datpro.ext_to_sentence(extraction) + '\n'
                     else:
-                        ext_str = data.ext_to_string(extraction) + '\n'
+                        ext_str = datpro.ext_to_string(extraction) + '\n'
                     sentence_str += ext_str
                 all_pred.append(sentence_str)
                 sentence_str_allennlp = ''
@@ -580,7 +579,7 @@ class Model(pl.LightningModule):
                 words = sentence.split()
                 sentence_str = sentence + '\n'
                 split_sentences, conj_words, sentences_indices = \
-                    data.coords_to_sentences(pred_coords, words)
+                    datpro.coords_to_sentences(pred_coords, words)
                 all_sentence_indices.append(sentences_indices)
                 all_conjunct_words.append(conj_words)
                 total1 += len(split_sentences)

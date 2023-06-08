@@ -392,7 +392,8 @@ class Carb():
         self._dev_benchmark = Benchmark('carb/data/gold/dev.tsv')
         self._test_benchmark = Benchmark('carb/data/gold/test.tsv')
         self.matchingFunc = Matcher.binary_linient_tuple_match
-        self._all_predictions, self._all_pos_words, self._all_verb_words = {}, {}, {}
+        self._all_predictions, self._all_pos_words, self._all_verb_words =\
+            {}, {}, {}
         self.score = {'carb_auc': 0.0, 'carb_f1': 0.0, 'carb_sum': 0.0}
         self.hparams = hparams
         self.num_extractions = self.hparams.num_extractions

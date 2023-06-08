@@ -12,7 +12,7 @@ import numpy as np
 from tqdm import tqdm
 
 import torch
-from torchtext import data
+import torchtext.data as dat # requires torchtext==0.5.0
 from transformers import AutoTokenizer
 from torchtext.vocab import build_vocab_from_iterator
 from torchtext.data.utils import get_tokenizer
@@ -79,10 +79,11 @@ def verb_tags(spacy_sentence):
     return verb, verb_indices, verb_words
 
 
-def _process_data(inp_fp, hparams, fields, tokenizer, label_dict,
+def make_examples(inp_fp, hparams, fields, tokenizer, label_dict,
                   spacy_model=None):
     model_str = hparams.model_str
-    examples, exampleDs, targets, lang_targets, orig_sentences = [], [], [], [], []
+    examples, example_dicts, targets, lang_targets, orig_sentences =\
+        [], [], [], [], []
 
     sentence = None
     max_extraction_length = 5
@@ -106,12 +107,12 @@ def _process_data(inp_fp, hparams, fields, tokenizer, label_dict,
                 orig_sentence = sentence.split('[unused1]')[0].strip()
                 orig_sentences.append(orig_sentence)
 
-                exampleD = {'text': input_ids,
+                example_dict = {'text': input_ids,
                             'labels': targets[:max_extraction_length],
                             'word_starts': word_starts,
                             'meta_data': orig_sentence}
                 if len(sentence.split()) <= 100:
-                    exampleDs.append(exampleD)
+                    example_dicts.append(example_dict)
 
                 targets = []
                 sentence = None
@@ -128,9 +129,9 @@ def _process_data(inp_fp, hparams, fields, tokenizer, label_dict,
                     word_starts.append(len(input_ids))
                     input_ids.extend(tokens)
                 input_ids.append(hparams.eos_token_id)
-                assert len(sentence.split()) == len(
-                    word_starts), ipdb.set_trace()
-        else:
+                assert len(sentence.split()) == \
+                       len(word_starts), ipdb.set_trace()
+        else: # not ('[unused' in line or new_example)
             if sentence is not None:
                 target = [label_dict[i] for i in line.split()]
                 target = target[:len(word_starts)]
@@ -138,35 +139,38 @@ def _process_data(inp_fp, hparams, fields, tokenizer, label_dict,
                 targets.append(target)
 
     if spacy_model != None:
-        sentences = [ed['meta_data'] for ed in exampleDs]
+        sentences = [ed['meta_data'] for ed in example_dicts]
         for sentence_index, spacy_sentence in tqdm(
                 enumerate(spacy_model.pipe(sentences, batch_size=10000))):
             spacy_sentence = remerge_sent(spacy_sentence)
             assert len(sentences[sentence_index].split()) == len(
                 spacy_sentence), ipdb.set_trace()
-            exampleD = exampleDs[sentence_index]
+            example_dict = example_dicts[sentence_index]
 
             pos, pos_indices, pos_words = pos_tags(spacy_sentence)
-            exampleD['pos_index'] = pos_indices
-            exampleD['pos'] = pos
+            example_dict['pos_index'] = pos_indices
+            example_dict['pos'] = pos
             verb, verb_indices, verb_words = verb_tags(spacy_sentence)
             if len(verb_indices) != 0:
-                exampleD['verb_index'] = verb_indices
+                example_dict['verb_index'] = verb_indices
             else:
-                exampleD['verb_index'] = [0]
-            exampleD['verb'] = verb
+                example_dict['verb_index'] = [0]
+            example_dict['verb'] = verb
 
-    for exampleD in exampleDs:
-        example = data.Example.fromdict(exampleD, fields)
+    for example_dict in example_dicts:
+        # https://pytorch.org/text/_modules/torchtext/data/example.html
+        example = dat.Example.fromdict(example_dict, fields)
         examples.append(example)
     return examples, orig_sentences
 
 
-def process_data(hparams, predict_sentences=None):
-    train_fp, dev_fp, test_fp = hparams.train_fp, hparams.dev_fp, hparams.test_fp
+def make_datasets(hparams, predict_sentences=None):
+    train_fp, dev_fp, test_fp =\
+        hparams.train_fp, hparams.dev_fp, hparams.test_fp
+    # bos = begin of sentence, eos = end of sentence
     hparams.bos_token_id, hparams.eos_token_id = 101, 102
 
-    do_lower_case = 'uncased' in hparams.model_str
+    do_lower_case = ('uncased' in hparams.model_str)
     tokenizer = \
         AutoTokenizer.from_pretrained(hparams.model_str,
                                       do_lower_case=do_lower_case,
@@ -180,17 +184,17 @@ def process_data(hparams, predict_sentences=None):
     nlp = spacy.load("en_core_web_sm")
     pad_index = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
 
-    TEXT = data.Field(use_vocab=False, batch_first=True, pad_token=pad_index)
-    WORD_STARTS = data.Field(use_vocab=False, batch_first=True, pad_token=0)
-    POS = data.Field(use_vocab=False, batch_first=True, pad_token=0)
-    POS_INDEX = data.Field(use_vocab=False, batch_first=True, pad_token=0)
-    VERB = data.Field(use_vocab=False, batch_first=True, pad_token=0)
-    VERB_INDEX = data.Field(use_vocab=False, batch_first=True, pad_token=0)
-    META_DATA = data.Field(sequential=False)
-    VERB_WORDS = data.Field(sequential=False)
-    POS_WORDS = data.Field(sequential=False)
-    LABELS = data.NestedField(
-        data.Field(use_vocab=False, batch_first=True, pad_token=-100),
+    TEXT = dat.Field(use_vocab=False, batch_first=True, pad_token=pad_index)
+    WORD_STARTS = dat.Field(use_vocab=False, batch_first=True, pad_token=0)
+    POS = dat.Field(use_vocab=False, batch_first=True, pad_token=0)
+    POS_INDEX = dat.Field(use_vocab=False, batch_first=True, pad_token=0)
+    VERB = dat.Field(use_vocab=False, batch_first=True, pad_token=0)
+    VERB_INDEX = dat.Field(use_vocab=False, batch_first=True, pad_token=0)
+    META_DATA = dat.Field(sequential=False)
+    VERB_WORDS = dat.Field(sequential=False)
+    POS_WORDS = dat.Field(sequential=False)
+    LABELS = dat.NestedField(
+        dat.Field(use_vocab=False, batch_first=True, pad_token=-100),
         use_vocab=False)
 
     fields = {'text': ('text', TEXT), 'labels': ('labels', LABELS),
@@ -210,7 +214,10 @@ def process_data(hparams, predict_sentences=None):
         label_dict = {'CP_START': 2, 'CP': 1,
                       'CC': 3, 'SEP': 4, 'OTHERS': 5, 'NONE': 0}
 
-    cached_train_fp, cached_dev_fp, cached_test_fp = f'{train_fp}.{hparams.model_str.replace("/", "_")}.pkl', f'{dev_fp}.{hparams.model_str.replace("/", "_")}.pkl', f'{test_fp}.{hparams.model_str.replace("/", "_")}.pkl'
+    cached_train_fp, cached_dev_fp, cached_test_fp =\
+        f'{train_fp}.{hparams.model_str.replace("/", "_")}.pkl',\
+        f'{dev_fp}.{hparams.model_str.replace("/", "_")}.pkl', \
+        f'{test_fp}.{hparams.model_str.replace("/", "_")}.pkl'
 
     all_sentences = []
     if 'predict' in hparams.mode:
@@ -235,42 +242,45 @@ def process_data(hparams, predict_sentences=None):
                     tokenized_line + ' [unused1] [unused2] [unused3]')
                 predict_sentences.append('\n')
 
-        predict_examples, all_sentences = _process_data(predict_sentences,
-                                                        hparams, fields,
-                                                        tokenizer, label_dict,
+        predict_examples, all_sentences = make_examples(predict_sentences,
+                                                        hparams,
+                                                        fields,
+                                                        tokenizer,
+                                                        label_dict,
                                                         None)
         META_DATA.build_vocab(
-            data.Dataset(predict_examples, fields=fields.values()))
+            dat.Dataset(predict_examples, fields=fields.values()))
 
         predict_dataset = [(len(ex.text), idx, ex, fields) for idx, ex in
                            enumerate(predict_examples)]
-        train_dataset, dev_dataset, test_dataset = predict_dataset, predict_dataset, predict_dataset
+        train_dataset, dev_dataset, test_dataset =\
+            predict_dataset, predict_dataset, predict_dataset
     else:
         if not os.path.exists(cached_train_fp) or hparams.build_cache:
-            train_examples, _ = _process_data(train_fp, hparams, fields,
+            train_examples, _ = make_examples(train_fp, hparams, fields,
                                               tokenizer, label_dict, nlp)
             pickle.dump(train_examples, open(cached_train_fp, 'wb'))
         else:
             train_examples = pickle.load(open(cached_train_fp, 'rb'))
 
         if not os.path.exists(cached_dev_fp) or hparams.build_cache:
-            dev_examples, _ = _process_data(dev_fp, hparams, fields, tokenizer,
+            dev_examples, _ = make_examples(dev_fp, hparams, fields, tokenizer,
                                             label_dict, nlp)
             pickle.dump(dev_examples, open(cached_dev_fp, 'wb'))
         else:
             dev_examples = pickle.load(open(cached_dev_fp, 'rb'))
 
         if not os.path.exists(cached_test_fp) or hparams.build_cache:
-            test_examples, _ = _process_data(test_fp, hparams, fields,
+            test_examples, _ = make_examples(test_fp, hparams, fields,
                                              tokenizer, label_dict, nlp)
             pickle.dump(test_examples, open(cached_test_fp, 'wb'))
         else:
             test_examples = pickle.load(open(cached_test_fp, 'rb'))
 
         META_DATA.build_vocab(
-            data.Dataset(train_examples, fields=fields.values()), data.Dataset(
+            dat.Dataset(train_examples, fields=fields.values()), dat.Dataset(
                 dev_examples, fields=fields.values()),
-            data.Dataset(test_examples, fields=fields.values()))
+            dat.Dataset(test_examples, fields=fields.values()))
 
         train_dataset = [(len(ex.text), idx, ex, fields) for idx, ex in
                          enumerate(train_examples)]
@@ -280,7 +290,8 @@ def process_data(hparams, predict_sentences=None):
                         enumerate(test_examples)]
         train_dataset.sort()  # to simulate bucket sort (along with pad_data)
 
-    return train_dataset, dev_dataset, test_dataset, META_DATA.vocab, all_sentences
+    return train_dataset, dev_dataset, test_dataset, \
+        META_DATA.vocab, all_sentences
 
 
 class dotdict(dict):
@@ -347,7 +358,9 @@ def pad_data(data):
 
 def ext_to_string(extraction):
     ext_str = ''
-    ext_str = f'{extraction.confidence:.02f}: ({extraction.args[0]}; {extraction.pred})'
+    ext_str =\
+        f'{extraction.confidence:.02f}: ' \
+        f'({extraction.args[0]}; {extraction.pred})'
     if len(extraction.args) >= 2:
         ext_str = f'{ext_str[:-1]}; {"; ".join(extraction.args[1:])})'
     return ext_str
@@ -384,7 +397,8 @@ def convert_to_namespace(d):
 
 
 def override_args(loaded_hparams_dict, current_hparams_dict, cline_sys_args):
-    # override the values of loaded_hparams_dict with the values i current_hparams_dict
+    # override the values of loaded_hparams_dict
+    # with the values i current_hparams_dict
     # (only the keys in cline_sys_args)
     for arg in cline_sys_args:
         if '--' in arg:
@@ -409,7 +423,8 @@ def coords_to_sentences(conj_coords, words):
 
     num_coords = len(conj_coords)
     # for k in list(conj_coords):
-    #     if len(conj_coords[k].conjuncts) < 3 and words[conj_coords[k].cc].lower() == 'and':
+    #     if len(conj_coords[k].conjuncts) < 3 \
+    #     and words[conj_coords[k].cc].lower() == 'and':
     #         conj_coords.pop(k)
     # if len(conj_coords[k].conjuncts) < 3:
     #     conj_coords.pop(k)
@@ -422,8 +437,10 @@ def coords_to_sentences(conj_coords, words):
     #     if named_entity:
     #         # conj_words = []
     #         # for conjunct in conj_coords[k].conjuncts:
-    #         #     conj_words.append(' '.join(words[conjunct[0]:conjunct[1]+1]))
-    #         # open('temp.txt', 'a').write('\n'+' '.join(words)+'\n'+'\n'.join(conj_words)+'\n')
+    #         #     conj_words.append(
+    #           ' '.join(words[conjunct[0]:conjunct[1]+1]))
+    #         # open('temp.txt', 'a').write(
+    #           '\n'+' '.join(words)+'\n'+'\n'.join(conj_words)+'\n')
     #         conj_coords.pop(k)
 
     remove_unbreakable_conjuncts(conj_coords, words)
@@ -549,8 +566,9 @@ def get_sentences(sentences, conj_same_level, conj_coords, sentence_indices):
                     for conj_structure in conj_coords[conj].conjuncts:
                         new_sentence = []
                         for i in sentence:
-                            if i in range(conj_structure[0], conj_structure[
-                                                                 1] + 1) or i < min or i > max:
+                            if i in range(conj_structure[0],
+                                    conj_structure[1] + 1) or\
+                                    i < min or i > max:
                                 new_sentence.append(i)
 
                         to_add.append(new_sentence)
